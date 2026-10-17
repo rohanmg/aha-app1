@@ -1,0 +1,84 @@
+{% extends "base.html" %}
+{% block title %}Preview · Amber Home Automation{% endblock %}
+{% block content %}
+
+<h1 class="font-display text-xl font-semibold tracking-tight text-stone-900">What-if preview</h1>
+<p class="mt-1 max-w-2xl text-sm leading-6 text-stone-500">
+  See exactly what the rules would do — without sending anything. This page never writes to your
+  inverter, even when automation is running. Use it to sanity-check thresholds before going live.
+</p>
+
+{# ---- Right now ---- #}
+<section class="card mt-6 p-6">
+  <h2 class="text-sm font-semibold uppercase tracking-wide text-stone-400">Right now</h2>
+  <p class="mt-1 text-sm text-stone-500">One read-only fetch of live prices and battery state, evaluated against your current settings.</p>
+  <div class="mt-4 flex items-center gap-3">
+    <button hx-post="/preview/right-now" hx-target="#preview-now-result" hx-swap="innerHTML"
+            class="rounded-xl bg-stone-900 px-5 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-stone-700 active:scale-[.98]">
+      Evaluate this minute
+    </button>
+    <span class="text-xs text-stone-400">Targets keep their state; nothing is sent.</span>
+  </div>
+  <div id="preview-now-result" class="mt-4"></div>
+</section>
+
+{# ---- What-if ---- #}
+<section class="card mt-4 p-6">
+  <h2 class="text-sm font-semibold uppercase tracking-wide text-stone-400">What if</h2>
+  <p class="mt-1 text-sm text-stone-500">Pretend the battery and prices were at these values, and see the resulting decisions.</p>
+  <form hx-post="/preview/what-if" hx-target="#preview-whatif-result" hx-swap="innerHTML" class="mt-4">
+    <div class="grid gap-x-6 gap-y-3 sm:grid-cols-4">
+      <div>
+        <label class="field-label" for="soc">Battery SoC (%)</label>
+        <input id="soc" name="soc" required class="field-input" value="{{ initial_soc if initial_soc is not none else '' }}">
+      </div>
+      <div>
+        <label class="field-label" for="buy">Buy price ({{ settings.get('PRICE_UNIT', 'c/kWh') }})</label>
+        <input id="buy" name="buy" required class="field-input" value="{{ initial_buy if initial_buy is not none else '' }}">
+      </div>
+      <div>
+        <label class="field-label" for="feed_in">Feed-in price {{ settings.get('PRICE_UNIT', 'c/kWh') }}</label>
+        <input id="feed_in" name="feed_in" class="field-input" value="{{ initial_feed if initial_feed is not none else '' }}">
+      </div>
+      <div>
+        <label class="field-label" for="forecast">Forecast (comma-separated)</label>
+        <input id="forecast" name="forecast" class="field-input" value="{{ initial_forecast }}">
+      </div>
+    </div>
+    <button type="submit"
+            class="mt-4 rounded-xl bg-accent px-5 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-accent-strong active:scale-[.98]">
+      Show what would happen
+    </button>
+  </form>
+  <div id="preview-whatif-result" class="mt-4"></div>
+</section>
+
+{# ---- Replay ---- #}
+<section class="card mt-4 p-6">
+  <h2 class="text-sm font-semibold uppercase tracking-wide text-stone-400">Replay last 24 hours</h2>
+  <p class="mt-1 text-sm text-stone-500">
+    Runs the rules over the stored measurements from the last 24 hours, so you can sanity-check your
+    thresholds before switching anything on. Overrides below apply to this replay only and are never saved.
+  </p>
+  <form hx-post="/preview/replay" hx-target="#preview-replay-result" hx-swap="innerHTML" class="mt-4">
+    <div class="grid gap-x-6 gap-y-3 sm:grid-cols-3">
+      <div>
+        <label class="field-label" for="TARGET_MRL">Override SoC floor (%)</label>
+        <input id="TARGET_MRL" name="TARGET_MRL" class="field-input" placeholder="keep {{ settings.get('TARGET_MRL', 30) }}">
+      </div>
+      <div>
+        <label class="field-label" for="PRICE_THRESHOLD_CENTS">Override price limit ({{ settings.get('PRICE_UNIT', 'c/kWh') }})</label>
+        <input id="PRICE_THRESHOLD_CENTS" name="PRICE_THRESHOLD_CENTS" class="field-input" placeholder="keep {{ settings.get('PRICE_THRESHOLD_CENTS', 30) }}">
+      </div>
+      <div class="flex items-end">
+        <button type="submit"
+                class="w-full rounded-xl border border-stone-200 bg-white px-5 py-2 text-sm font-semibold text-stone-700 shadow-sm transition hover:bg-stone-50 active:scale-[.98]">
+          Replay history
+        </button>
+      </div>
+    </div>
+  </form>
+  <div id="preview-replay-result" class="mt-4"></div>
+</section>
+
+{% endblock %}
