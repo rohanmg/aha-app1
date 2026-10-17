@@ -1,0 +1,9 @@
+{% if ok %}
+<div class="rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-sm font-medium text-green-700">
+  ✓ {{ message }}
+</div>
+{% else %}
+<div class="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+  ⚠ {{ message }}{% if hint %}<div class="mt-1 text-xs text-red-500">{{ hint }}</div>{% endif %}
+</div>
+{% endif %}
