@@ -1,0 +1,31 @@
+<div class="flex flex-wrap items-center gap-3">
+  {% if running %}
+  <span class="badge bg-green-50 text-green-700 ring-1 ring-green-200">
+    <span class="h-1.5 w-1.5 rounded-full bg-green-500"></span> RUNNING
+  </span>
+  {% else %}
+  <span class="badge bg-red-50 text-red-700 ring-1 ring-red-200">
+    <span class="h-1.5 w-1.5 rounded-full bg-red-500"></span> STOPPED
+  </span>
+  {% endif %}
+
+  {% if dry_run %}
+  <span class="badge bg-amber-50 text-amber-700 ring-1 ring-amber-200">DRY RUN</span>
+  {% endif %}
+
+  <span class="text-xs text-stone-500">
+    Price / inverter: <span class="font-medium text-stone-700">{{ price_provider_name }} / {{ inverter_provider_name }}</span>
+  </span>
+</div>
+
+{% if provider_error %}
+<div class="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-medium text-amber-800">
+  ⚠ Provider error: {{ provider_error }}
+</div>
+{% endif %}
+
+{% if running and last_poll_at is not none and next_poll_at is none %}
+<div class="mt-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">
+  ⚠ No successful cycle recently — check that providers are configured and reachable.
+</div>
+{% endif %}
