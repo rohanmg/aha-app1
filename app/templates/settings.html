@@ -1,0 +1,73 @@
+{% extends "base.html" %}
+{% block title %}Settings · Amber Home Automation{% endblock %}
+{% block content %}
+
+<div class="flex items-center justify-between">
+  <div>
+    <h1 class="font-display text-xl font-semibold tracking-tight text-stone-900">Settings</h1>
+    <p class="mt-1 text-sm text-stone-500">Precedence: your setting → instance default → built-in default.</p>
+  </div>
+  {% if saved %}
+  <span class="badge bg-green-50 text-green-700 ring-1 ring-green-200">Saved ✓</span>
+  {% endif %}
+</div>
+
+{% if errors %}
+<div class="mt-5 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+  {% for e in errors %}<p class="font-medium">⚠ {{ e }}</p>{% endfor %}
+</div>
+{% endif %}
+
+<form method="post" action="/settings" class="mt-6 space-y-5">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token | default('') }}">
+  {% for group_name, fields in param_groups.items() %}
+  {% if fields %}
+  <section class="card p-6">
+    <h2 class="text-sm font-semibold uppercase tracking-wide text-stone-400">{{ group_name }}</h2>
+    <div class="mt-4 grid gap-x-8 gap-y-4 sm:grid-cols-2">
+      {% for f in fields %}
+      {% if f.type == 'bool' %}
+      <label class="flex items-start gap-3 rounded-lg px-1 py-1 sm:col-span-2 lg:col-span-1">
+        <input type="checkbox" name="{{ f.key }}" {% if f.value in (True, 'true') %}checked{% endif %}
+               class="mt-0.5 h-4 w-4 rounded border-slate-300 text-accent focus:ring-accent">
+        <span>
+          <span class="field-label">{{ f.label }}</span>
+          <span class="field-help">{{ f.help_text }}</span>
+        </span>
+      </label>
+      {% elif f.type == 'choice' %}
+      <div>
+        <label class="field-label" for="{{ f.key }}">{{ f.label }}</label>
+        <select id="{{ f.key }}" name="{{ f.key }}" class="field-input">
+          <option value="" {% if not f.value %}selected{% endif %}>— not set —</option>
+          {% for c in f.choices %}
+          <option value="{{ c }}" {% if f.value == c %}selected{% endif %}>{{ c }}</option>
+          {% endfor %}
+        </select>
+        <span class="field-help">{{ f.help_text }}</span>
+      </div>
+      {% else %}
+      <div>
+        <label class="field-label" for="{{ f.key }}">{{ f.label }}</label>
+        <input id="{{ f.key }}" name="{{ f.key }}" value="{{ f.display_value }}"
+               {% if f.placeholder %}placeholder="{{ f.placeholder }}"{% endif %}
+               {% for k, v in f.attrs.items() %}{{ k }}="{{ v }}" {% endfor %}
+               class="field-input">
+        <span class="field-help">{{ f.help_text }}{% if f.attrs %} (bounds: {{ f.attrs.get('min', '—') }}–{{ f.attrs.get('max', '—') }}){% endif %}</span>
+      </div>
+      {% endif %}
+      {% endfor %}
+    </div>
+  </section>
+  {% endif %}
+  {% endfor %}
+
+  <div class="flex justify-end">
+    <button type="submit"
+            class="rounded-xl bg-accent px-6 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-accent-strong active:scale-[.98]">
+      Save settings
+    </button>
+  </div>
+</form>
+
+{% endblock %}
