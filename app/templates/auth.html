@@ -49,6 +49,11 @@
         <span class="field-help">At least 10 characters.</span>
         {% endif %}
       </div>
+      {% if mode == 'login' %}
+      <p class="text-right text-xs">
+        <a class="font-medium text-accent hover:underline" href="/reset">Forgot password?</a>
+      </p>
+      {% endif %}
       <button type="submit"
               class="mt-2 w-full rounded-xl bg-accent px-6 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-accent-strong active:scale-[.99]">
         {% if mode == 'signup' %}Create account{% else %}Sign in{% endif %}
