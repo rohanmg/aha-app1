@@ -120,7 +120,8 @@ async def lifespan(app: FastAPI):
         from app.worker import run_loop
 
         tasks.append(asyncio.create_task(
-            run_loop(SessionLocal, interval=max(30, int(settings.WORKER_INTERVAL_SECONDS))),
+            run_loop(SessionLocal,
+                     interval_seconds=max(30, int(settings.WORKER_INTERVAL_SECONDS))),
             name="embedded-worker",
         ))
     app.state.background_tasks = tasks
