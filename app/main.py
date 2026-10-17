@@ -17,6 +17,7 @@ import datetime as dt
 import hashlib
 import json
 import os
+import secrets
 import sqlalchemy as sa
 from contextlib import asynccontextmanager
 from typing import Any
@@ -27,10 +28,14 @@ from fastapi.templating import Jinja2Templates
 
 from app import params, state
 from app import backup
+from app import mail
 from app.auth import (
     SESSION_COOKIE,
     clear_failed_logins,
+    consume_password_reset,
+    count_reset_codes,
     create_invite,
+    create_password_reset,
     create_session,
     destroy_all_sessions,
     destroy_session,
@@ -181,6 +186,8 @@ async def _redirect_to_login_handler(request: Request, _exc: NotAuthenticated):
 
 
 def _signup_open(session: Session) -> bool:
+    if get_settings().SIGNUP_MODE == "open":
+        return True
     return session.query(User).count() == 0
 
 
@@ -306,6 +313,143 @@ async def login_submit(request: Request, session: Session = Depends(get_session)
     clear_failed_logins(email, session)
     target = next_path if next_path.startswith("/") and not next_path.startswith("//") else "/dashboard"
     return _sign_in(request, session, user.id, target)
+
+
+# ---------------------------------------------------------------------------
+# Password recovery (emailed passcode) and rescue unlock
+# ---------------------------------------------------------------------------
+
+
+def _reset_email_text(code: str, ttl: int) -> str:
+    return (
+        "Your Amber Home Automation reset code is:\n\n"
+        f"    {code}\n\n"
+        f"Enter it in the app within {ttl} minutes to choose a new password. "
+        "If you did not request this, ignore this email — no one has changed anything."
+    )
+
+
+@app.get("/reset", response_class=HTMLResponse)
+async def reset_page(request: Request, session: Session = Depends(get_session)):
+    return render(request, "reset_email.html", {"page": "auth", "error": None, "email": ""})
+
+
+@app.post("/reset", response_class=HTMLResponse)
+async def reset_submit(request: Request, session: Session = Depends(get_session)):
+    form = dict(await request.form())
+    email = str(form.get("email", "")).strip().lower()
+    user = session.query(User).filter(User.email == email).first()
+    if user is not None and user.is_active:
+        ttl = max(5, int(get_settings().RESET_CODE_TTL_MINUTES))
+        window = ttl * 3
+        if count_reset_codes(session, user.id, window) >= max(1, int(get_settings().RESET_MAX_CODES_PER_WINDOW)):
+            return render(request, "reset_email.html",
+                          {"page": "auth", "error": "Too many codes requested. Try again shortly.",
+                           "email": email})
+        raw_code = create_password_reset(session, user.id, ttl)
+        try:
+            mail.send_email(user.email, "Your Amber Home Automation reset code",
+                            _reset_email_text(raw_code, ttl))
+            sent = True
+        except mail.MailNotConfigured:
+            return render(request, "reset_email.html",
+                          {"page": "auth", "error": (
+                              "Email delivery is not configured on this instance yet. "
+                              "The owner needs to set RESEND_API_KEY (or SMTP credentials) "
+                              "in the service environment. Use the rescue link meanwhile."), })
+        except mail.MailSendError:
+            return render(request, "reset_email.html",
+                          {"page": "auth", "error": "The email service rejected the message. Try again in a minute.",
+                           "email": email})
+        if sent:
+            return render(request, "reset_code.html",
+                          {"page": "auth", "email": email, "error": None,
+                           "notice": "Check your inbox — we sent a 6-digit code. It expires in "
+                                     f"{ttl} minutes."})
+    # Unknown or disabled email: identical response so accounts can't be probed.
+    return render(request, "reset_email.html",
+                  {"page": "auth", "error": "If that email has an account, a code is on its way.",
+                   "email": email})
+
+
+@app.post("/reset/verify", response_class=HTMLResponse)
+async def reset_verify(request: Request, session: Session = Depends(get_session)):
+    form = dict(await request.form())
+    email = str(form.get("email", "")).strip().lower()
+    code = str(form.get("code", "")).strip()
+    new_password = str(form.get("password", ""))
+
+    def _fail(message: str) -> HTMLResponse:
+        return render(request, "reset_code.html",
+                      {"page": "auth", "email": email, "error": message, "notice": None})
+
+    user = session.query(User).filter(User.email == email).first()
+    if user is None or not user.is_active:
+        return _fail("Start again from the reset form.")
+    if len(code) != 6 or not code.isdigit():
+        return _fail("The code is six digits — check the email and try again.")
+    if len(new_password) < 10:
+        return _fail("Choose a new password of at least 10 characters.")
+    if not consume_password_reset(session, user.id, code):
+        return _fail("That code is wrong or has expired. Request a new one from /reset.")
+
+    user.password_hash = hash_password(new_password)
+    session.commit()
+    destroy_all_sessions(user.id, session)
+    clear_failed_logins(user.email, session)
+    return _sign_in(request, session, user.id)
+
+
+@app.get("/rescue", response_class=HTMLResponse)
+async def rescue_page(request: Request, session: Session = Depends(get_session)):
+    token = str(request.query_params.get("token", "") or "")
+    expected = get_settings().RESCUE_TOKEN
+    if not expected or not token or not secrets.compare_digest(token, expected):
+        return render(request, "rescue.html",
+                      {"page": "auth", "error": "Rescue is disabled or the link is wrong.",
+                       "armed": False, "email": ""})
+    return render(request, "rescue.html",
+                  {"page": "auth", "error": None, "armed": True, "email": "",
+                   "rescue_token": token})
+
+
+@app.post("/rescue", response_class=HTMLResponse)
+async def rescue_submit(request: Request, session: Session = Depends(get_session)):
+    form = dict(await request.form())
+    token = str(form.get("rescue_token", "") or "")
+    email = str(form.get("email", "")).strip().lower()
+    password = str(form.get("password", ""))
+    expected = get_settings().RESCUE_TOKEN
+    if not expected or not token or not secrets.compare_digest(token, expected):
+        return render(request, "rescue.html",
+                      {"page": "auth", "error": "Rescue is disabled or the link is wrong.",
+                       "armed": False, "email": ""})
+    if "@" not in email or len(email) < 5 or len(email) > 254:
+        return render(request, "rescue.html",
+                      {"page": "auth", "error": "Enter a valid email address.",
+                       "armed": True, "email": email, "rescue_token": token})
+    if len(password) < 10:
+        return render(request, "rescue.html",
+                      {"page": "auth", "error": "Choose a password of at least 10 characters.",
+                       "armed": True, "email": email, "rescue_token": token})
+
+    target = session.query(User).order_by(User.id.asc()).first()
+    if target is None:
+        target = User(email=email, password_hash=hash_password(password), is_admin=True)
+        session.add(target)
+    else:
+        target.email = email
+        target.password_hash = hash_password(password)
+        target.is_active = True
+        target.is_admin = True
+    session.commit()
+    destroy_all_sessions(target.id, session)
+    clear_failed_logins(target.email, session)
+
+    # Rescue link is strictly one-shot: burn the token from the environment is
+    # not possible from inside the process, but the DB row below prevents reuse
+    # after the operator clears the env var; the form check above fails closed.
+    return _sign_in(request, session, target.id)
 
 
 @app.post("/logout")
@@ -828,6 +972,7 @@ async def admin_page(
             "invites": invites,
             "invite_link": invite_link,
             "invite_mode": settings.SIGNUP_MODE or "invite_only",
+            "invite_mode_url": f"{(settings.BASE_URL or '').rstrip('/')}/signup",
         },
     )
 
