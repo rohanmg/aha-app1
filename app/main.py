@@ -465,8 +465,9 @@ async def logout(request: Request, session: Session = Depends(get_session)):
 # ---------------------------------------------------------------------------
 
 
-@app.get("/healthz")
+@app.api_route("/healthz", methods=["GET", "HEAD"])
 async def healthz() -> JSONResponse:
+    # HEAD is honored so uptime monitors that probe with HEAD get a 200 too.
     return JSONResponse({"ok": True})
 
 
