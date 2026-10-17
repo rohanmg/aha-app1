@@ -30,6 +30,11 @@ class Settings(BaseSettings):
     SMTP_USER: Optional[str] = None
     SMTP_PASSWORD: Optional[str] = None
     SMTP_FROM: Optional[str] = None
+    RESEND_API_KEY: Optional[str] = None
+    MAIL_FROM: str = "onboarding@resend.dev"
+    RESET_CODE_TTL_MINUTES: int = 10
+    RESET_MAX_CODES_PER_WINDOW: int = 3
+    RESCUE_TOKEN: Optional[str] = None
     SESSION_LIFETIME_HOURS: int = 72
     SIGNUP_MODE: str = "invite_only"
     MAX_USERS: int = 50
