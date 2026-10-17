@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block title %}Reset password · Amber Home Automation{% endblock %}
+{% block content %}
+
+<div class="mx-auto flex min-h-[70vh] w-full max-w-md flex-col justify-center py-10">
+  <div class="mb-8 text-center">
+    <span class="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-accent-soft text-2xl text-accent">🔑</span>
+    <h1 class="font-display mt-5 text-3xl font-semibold tracking-tight text-stone-900">Reset your password</h1>
+    <p class="mt-2 text-sm leading-6 text-stone-500">
+      Enter your account email and we'll send a 6-digit code. Use it to choose a new password.
+    </p>
+  </div>
+
+  <div class="card p-7 sm:p-8">
+    {% if error %}
+    <div class="mb-5 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm leading-6 text-red-700">
+      {{ error }}
+    </div>
+    {% endif %}
+    <form method="post" action="/reset" class="space-y-4">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token | default('') }}">
+      <div>
+        <label class="field-label" for="email">Email address</label>
+        <input id="email" name="email" type="email" value="{{ email or '' }}" required autocomplete="email"
+               placeholder="you@example.com" class="field-input">
+      </div>
+      <button type="submit"
+              class="mt-2 w-full rounded-xl bg-accent px-6 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-accent-strong active:scale-[.99]">
+        Send me a code
+      </button>
+    </form>
+  </div>
+
+  <p class="mt-6 text-center text-xs leading-6 text-stone-400">
+    Remembered it? <a class="font-medium text-accent hover:underline" href="/login">Back to sign-in</a>.
+  </p>
+</div>
+
+{% endblock %}
