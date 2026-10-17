@@ -20,7 +20,7 @@ from typing import Optional
 
 from argon2 import PasswordHasher
 from argon2.exceptions import InvalidHashError, VerifyMismatchError, VerificationError
-from sqlalchemy import delete, select
+from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session as DBSession
 
 from app.config import get_settings
@@ -148,6 +148,64 @@ def destroy_all_sessions(user_id: int, session: DBSession) -> None:
     """Revoke every session for a user (admin disable / password change)."""
     session.execute(delete(LoginSession).where(LoginSession.user_id == user_id))
     session.commit()
+
+
+# ---------------------------------------------------------------------------
+# Password reset (one-use emailed passcode)
+# ---------------------------------------------------------------------------
+
+
+def create_password_reset(session: DBSession, user_id: int, ttl_minutes: int) -> str:
+    """Issue a new 6-digit passcode, invalidating older ones for the user."""
+    from app.models import PasswordReset
+
+    session.execute(
+        delete(PasswordReset).
+        where(PasswordReset.user_id == user_id, PasswordReset.used_at.is_(None))
+    )
+    code = f"{secrets.randbelow(1_000_000):06d}"
+    now = dt.datetime.now(dt.timezone.utc)
+    session.add(
+        PasswordReset(
+            user_id=user_id,
+            code_hash=_token_hash(code),
+            created_at=now,
+            expires_at=now + dt.timedelta(minutes=ttl_minutes),
+        )
+    )
+    session.commit()
+    return code
+
+
+def count_reset_codes(session: DBSession, user_id: int, minutes: int) -> int:
+    """Codes issued for this user inside the last ``minutes`` minutes."""
+    from app.models import PasswordReset
+
+    since = dt.datetime.now(dt.timezone.utc) - dt.timedelta(minutes=minutes)
+    return int(session.scalar(
+        select(func.count(PasswordReset.id)).
+        where(PasswordReset.user_id == user_id, PasswordReset.created_at >= since)
+    ) or 0)
+
+
+def consume_password_reset(session: DBSession, user_id: int, code: str) -> bool:
+    """Mark the matching live passcode as used; False when no match."""
+    from app.models import PasswordReset
+
+    row = session.scalar(
+        select(PasswordReset).
+        where(
+            PasswordReset.user_id == user_id,
+            PasswordReset.code_hash == _token_hash(code),
+            PasswordReset.used_at.is_(None),
+            PasswordReset.expires_at >= dt.datetime.now(dt.timezone.utc),
+        )
+    )
+    if row is None:
+        return False
+    row.used_at = dt.datetime.now(dt.timezone.utc)
+    session.commit()
+    return True
 
 
 # ---------------------------------------------------------------------------
