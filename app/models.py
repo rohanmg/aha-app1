@@ -221,9 +221,26 @@ class PollHistory(Base):
     raw_json: Mapped[str | None] = mapped_column(Text, nullable=True)
 
 
+class PasswordReset(Base):
+    """One-use hashed passcode for password recovery via emailed code."""
+
+    __tablename__ = "password_resets"
+    __table_args__ = (Index("ix_password_resets_user_time", "user_id", "created_at"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    code_hash: Mapped[str] = mapped_column(String(128), index=True)
+    created_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    expires_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True))
+    used_at: Mapped[dt.datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
 __all__ = [
     "User",
     "Invite",
+    "PasswordReset",
     "LoginSession",
     "LoginAttempt",
     "Credential",
