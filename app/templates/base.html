@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}Amber Home Automation{% endblock %}</title>
+  <script src="https://cdn.jsdelivr.net/npm/htmx.org@2.0.4/dist/htmx.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style type="text/tailwindcss">
+    /* Premium, serious theme: warm stone neutrals, deep amber accent,
+       Fraunces display headings over Inter body text. */
+    @theme {
+      --font-sans: 'Inter', ui-sans-serif, system-ui, sans-serif;
+      --font-display: 'Fraunces', ui-serif, Georgia, serif;
+      --color-accent: #b45309;
+      --color-accent-strong: #92400e;
+      --color-accent-soft: #fef3c7;
+      --color-accent-border: #fcd34d;
+      --color-ink: #1c1917;
+    }
+    @utility card {
+      background: #fffdf9;
+      border-radius: 1rem;
+      box-shadow: 0 1px 2px rgba(28, 25, 23, .05), 0 12px 32px -14px rgba(28, 25, 23, .18);
+      border: 1px solid rgba(28, 25, 23, .08);
+    }
+    @utility badge {
+      display: inline-flex;
+      align-items: center;
+      gap: .375rem;
+      border-radius: 9999px;
+      padding: .25rem .75rem;
+      font-size: .75rem;
+      font-weight: 600;
+      line-height: 1.25rem;
+    }
+    @utility field-label {
+      display: block;
+      font-size: .8125rem;
+      font-weight: 600;
+      color: #44403c;
+    }
+    @utility field-help {
+      margin-top: .25rem;
+      font-size: .75rem;
+      line-height: 1rem;
+      color: #a8a29e;
+    }
+    @utility field-input {
+      margin-top: .375rem;
+      display: block;
+      width: 100%;
+      border-radius: .625rem;
+      border: 1px solid #d6d3d1;
+      background: #ffffff;
+      padding: .5rem .75rem;
+      font-size: .875rem;
+      color: #1c1917;
+      box-shadow: 0 1px 1px rgba(28, 25, 23, .04);
+    }
+  </style>
+</head>
+<body class="h-full bg-stone-50 font-sans text-stone-900 antialiased"
+      hx-headers='{"X-CSRF-Token": "{{ csrf_token | default('') }}"}'>
+<header class="sticky top-0 z-30 border-b border-stone-200/70 bg-[#fffdf9]/85 backdrop-blur">
+  <div class="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-3 sm:px-6">
+    <a href="/dashboard" class="flex items-center gap-2.5">
+      <span class="flex h-8 w-8 items-center justify-center rounded-lg bg-accent-soft text-accent text-base">☀</span>
+      <span class="font-display text-sm font-semibold tracking-tight text-stone-900">Amber Home Automation</span>
+    </a>
+    <nav class="flex items-center gap-1 text-sm font-medium text-stone-600">
+      {% for href, name in [("/dashboard", "Dashboard"), ("/preview", "Preview"), ("/settings", "Settings"), ("/setup", "Setup")] %}
+      <a href="{{ href }}"
+         class="rounded-lg px-3 py-1.5 transition-colors {{ 'bg-accent-soft text-accent-strong' if page == href.strip('/') else 'hover:bg-stone-100 hover:text-stone-900' }}">
+        {{ name }}</a>
+      {% endfor %}
+      {% if user is defined and user and user.is_admin %}
+      <a href="/admin"
+         class="rounded-lg px-3 py-1.5 transition-colors {{ 'bg-accent-soft text-accent-strong' if page == 'admin' else 'hover:bg-stone-100 hover:text-stone-900' }}">
+        Admin</a>
+      {% endif %}
+      <form method="post" action="/logout" class="ml-2">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token | default('') }}">
+        <button type="submit" class="rounded-lg px-3 py-1.5 text-stone-500 transition-colors hover:bg-stone-100 hover:text-stone-900">
+          Sign out
+        </button>
+      </form>
+    </nav>
+  </div>
+</header>
+
+<main class="mx-auto max-w-6xl px-4 py-8 sm:px-6">
+  {% block content %}{% endblock %}
+</main>
+
+<footer class="mx-auto max-w-6xl px-4 pb-10 pt-4 text-xs leading-relaxed text-stone-400 sm:px-6">
+  Retailer or inverter-side automation may overwrite these settings. Run this app in dry-run for at least a day,
+  enable one rule at a time, and switch off any conflicting vendor schedules before going live. Provided as-is.
+</footer>
+</body>
+</html>
