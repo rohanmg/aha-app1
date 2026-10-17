@@ -1,0 +1,91 @@
+{% extends "base.html" %}
+{% block title %}Admin · Amber Home Automation{% endblock %}
+{% block content %}
+
+<h1 class="font-display text-xl font-semibold tracking-tight text-stone-900">Administration</h1>
+<p class="mt-1 max-w-2xl text-sm leading-6 text-stone-500">
+  Manage accounts and invitations for this instance. Disabling an account signs that person out
+  immediately and stops their automation until re-enabled.
+</p>
+
+{% if invite_link %}
+<div class="mt-5 rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800">
+  <p class="font-semibold">Invitation created. Send this link (shown once):</p>
+  <p class="mt-1 break-all font-mono text-xs">{{ invite_link }}</p>
+</div>
+{% endif %}
+
+<section class="card mt-6 p-6">
+  <div class="flex items-center justify-between">
+    <h2 class="text-sm font-semibold uppercase tracking-wide text-stone-400">Accounts</h2>
+    <span class="text-xs text-stone-400">{% if invite_mode == 'invite_only' %}invite-only signups{% else %}signup mode: {{ invite_mode }}{% endif %}</span>
+  </div>
+  <div class="mt-4 overflow-x-auto">
+    <table class="w-full text-sm">
+      <thead>
+        <tr class="border-b border-stone-200 text-left text-xs uppercase tracking-wide text-stone-400">
+          <th class="py-2 pr-4">Email</th>
+          <th class="py-2 pr-4">Role</th>
+          <th class="py-2 pr-4">Status</th>
+          <th class="py-2">Actions</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-stone-100">
+        {% for u in users %}
+        <tr>
+          <td class="py-2.5 pr-4 font-medium text-stone-800">{{ u.email }}</td>
+          <td class="py-2.5 pr-4 text-stone-500">{{ 'Admin' if u.is_admin else 'Member' }}</td>
+          <td class="py-2.5 pr-4">
+            {% if u.is_active %}
+            <span class="badge bg-green-50 text-green-700">Active</span>
+            {% else %}
+            <span class="badge bg-red-50 text-red-700">Disabled</span>
+            {% endif %}
+          </td>
+          <td class="py-2.5">
+            <form method="post" action="/admin/users/{{ u.id }}/{{ 'enable' if not u.is_active else 'disable' }}" class="flex gap-2">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token | default('') }}">
+              <button type="submit" class="rounded-lg border border-stone-200 bg-white px-3 py-1 text-xs font-semibold text-stone-700 transition hover:bg-stone-50">
+                {{ 'Enable' if not u.is_active else 'Disable' }}
+              </button>
+            </form>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section class="card mt-4 p-6">
+  <h2 class="text-sm font-semibold uppercase tracking-wide text-stone-400">Invitations</h2>
+  <form method="post" action="/admin/invites" class="mt-3 flex items-center gap-3">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token | default('') }}">
+    <button type="submit"
+            class="rounded-xl bg-accent px-5 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-accent-strong active:scale-[.98]">
+      Create invitation
+    </button>
+    <span class="text-xs text-stone-400">Single-use; the link is shown once after creating it.</span>
+  </form>
+  {% if invites %}
+  <ul class="mt-4 divide-y divide-stone-100 text-sm">
+    {% for inv in invites %}
+    <li class="flex items-center justify-between py-2">
+      <span class="font-mono text-xs text-stone-500">…{{ inv.token_hash[-12:] }}</span>
+      <span class="text-xs">
+        {% if inv.claimed_at %}
+        <span class="badge bg-stone-100 text-stone-500">Used</span>
+        {% else %}
+        <span class="badge bg-amber-50 text-amber-700">Unused</span>
+        {% endif %}
+        <span class="ml-2 text-stone-400">created {{ inv.created_at.strftime('%d %b %H:%M') }}</span>
+      </span>
+    </li>
+    {% endfor %}
+  </ul>
+  {% else %}
+  <p class="mt-3 text-sm text-stone-400">No invitations yet.</p>
+  {% endif %}
+</section>
+
+{% endblock %}
